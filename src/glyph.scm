@@ -1,10 +1,11 @@
-(define-library (xlang chars)
+(define-library
+  (xlang glyph)
   (import
     scheme
     r7rs
     srfi-14
     utf8
-    (xlang operator))
+    (xlang stream))
   (export
     %digit
     %nonzero)

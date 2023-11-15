@@ -1,4 +1,5 @@
-(define-library (xlang operator)
+(define-library
+  (xlang stream)
   (import
     scheme
     r7rs
@@ -7,6 +8,9 @@
     srfi-127
     (chicken base))
   (export
+    %result
+    %value
+    %input
     %identity
     %return
     %fail
@@ -22,28 +26,32 @@
     %flatten)
   (begin
 
-    (define (%fail)
-      (lambda (input) #f))
+    (define-record-type result%
+      (%result value input)
+      %result?
+      (value %value)
+      (input %input))
 
-    (define (%identity)
-      (lambda (input)
-        (if (null? input) #f input)))
+    (define ((%fail) input) #f)
 
-    (define (%return value)
-      (lambda (input)
-        (cons value input)))
+    (define ((%identity) input)
+      (if (null? input) #f
+        (%result
+          (car input)
+          (lseq-rest input))))
 
-    (define (%bind operator proc)
-      (lambda (input)
-        (and-let*
-          ((stream (operator input)))
-          ((proc (car stream)) (lseq-rest stream)))))
+    (define ((%return value) input)
+      (%result value input))
 
-    (define (%any-of operator . operators)
-      (lambda (input)
-        (or (operator input)
-          (if (null? operators) #f
-            ((apply %any-of operators) input)))))
+    (define ((%bind operator proc) input)
+      (and-let*
+        ((result (operator input)))
+        ((proc (%value result)) (%input result))))
+
+    (define ((%any-of operator . operators) input)
+      (or (operator input)
+        (if (null? operators) #f
+          ((apply %any-of operators) input))))
 
     (define (%foldr proc init operators)
       (%bind

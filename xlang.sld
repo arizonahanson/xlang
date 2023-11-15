@@ -4,11 +4,13 @@
     r7rs
     utf8
     srfi-127
-    (xlang token))
+    (xlang sigil)
+    (xlang stream))
   (begin
 
     (display
-      ((!float)
-       (generator->lseq read-char)))
+      (%value ((!float)
+       (generator->lseq read-char))))
+    (newline)
 
     ))

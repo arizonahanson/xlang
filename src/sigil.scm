@@ -1,10 +1,11 @@
-(define-library (xlang token)
+(define-library
+  (xlang sigil)
   (import
     scheme
     r7rs
     utf8
-    (xlang operator)
-    (xlang chars))
+    (xlang stream)
+    (xlang glyph))
   (export
     !integer
     !float)
@@ -18,10 +19,10 @@
 
     (define (!integer)
       (%any-of
+        (%is equal? #\0)
         (%each-of
           (%nonzero)
-          (%zero-or-more (%digit)))
-        (%is equal? #\0)))
+          (%zero-or-more (%digit)))))
 
     (define (!float)
       (!string
