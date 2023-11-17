@@ -4,32 +4,41 @@
     scheme
     r7rs
     utf8
-    (xlang stream)
+    (chicken base)
+    (xlang monad)
     (xlang glyph))
   (export
-    !integer
-    !float)
+    %flatten
+    %string
+    *integer
+    *float)
   (begin
 
-    (define (!string . operators)
+    (define (%flatten . parsers)
+      (%bind
+        (apply %each-of parsers)
+        (lambda (value)
+          (%return (flatten value)))))
+
+    (define (%string . operators)
       (%bind
         (apply %flatten operators)
         (lambda (value)
           (%return (apply string value)))))
 
-    (define (!integer)
+    (define (*integer)
       (%any-of
         (%is equal? #\0)
         (%each-of
-          (%nonzero)
-          (%zero-or-more (%digit)))))
+          (*nonzero)
+          (%zero-or-more (*digit)))))
 
-    (define (!float)
-      (!string
-        (!integer)
-        (%each-of
+    (define (*float)
+      (%string
+        (*integer)
+        (%maybe (%each-of
           (%is equal? #\.)
-          (%one-or-more (%digit)))
+          (%one-or-more (*digit))))
         (%maybe
           (%each-of
             (%any-of
@@ -38,7 +47,7 @@
             (%any-of
               (%is equal? #\+)
               (%is equal? #\-))
-            (!integer)))))
+            (*integer)))))
     ))
 
 

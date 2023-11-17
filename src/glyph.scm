@@ -5,26 +5,31 @@
     r7rs
     srfi-14
     utf8
-    (xlang stream))
+    (xlang monad))
   (export
-    %digit
-    %nonzero)
+    *whitespace
+    *digit
+    *nonzero
+    *letter)
   (begin
 
-    (define char-set:nonzero
-      (char-set-delete
-        char-set:digit #\0))
-
-    (define (%char-set cs)
+    (define (%char-set-is cs)
       (%is (lambda (value)
         (char-set-contains? cs value))))
 
-    (define (%digit)
-      (%char-set
-        char-set:digit))
+    (define (*whitespace)
+      (%char-set-is char-set:whitespace))
 
-    (define (%nonzero)
-      (%char-set
-        char-set:nonzero))
+    (define (*digit)
+      (%char-set-is char-set:digit))
+
+    (define char-set:nonzero
+      (char-set-delete char-set:digit #\0))
+
+    (define (*nonzero)
+      (%char-set-is char-set:nonzero))
+
+    (define (*letter)
+      (%char-set-is char-set:letter))
 
     ))

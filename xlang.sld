@@ -4,13 +4,17 @@
     r7rs
     utf8
     srfi-127
-    (xlang sigil)
-    (xlang stream))
+    (xlang monad)
+    (xlang glyph)
+    (xlang sigil))
   (begin
 
-    (display
-      (%value ((!float)
-       (generator->lseq read-char))))
-    (newline)
+    ((%bind
+       (%string (*integer))
+       (lambda (value)
+         (display value)
+         (newline)
+         display))
+     (generator->lseq read-char))
 
     ))
