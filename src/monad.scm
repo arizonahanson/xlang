@@ -9,24 +9,30 @@
       and-let*)
     (only
       srfi-127
-      lseq-rest))
+      generator->lseq
+      lseq-rest)
+    (only
+      srfi-158
+      make-coroutine-generator))
   (export
     %result
     %value
     %input
-    %fail
-    %identity
-    %return
-    %bind
-    %any-of
-    %foldr
-    %each-of
-    %none
-    %not
-    %maybe
-    %zero-or-more
-    %one-or-more
-    %is)
+    *fail
+    *identity
+    *return
+    *bind
+    *chain
+    *foldl
+    *foldr
+    *any-of
+    *each-of
+    *none
+    *not
+    *maybe
+    *zero-or-more
+    *one-or-more
+    *is)
   (begin
 
     (define-record-type result%
@@ -35,69 +41,94 @@
       (value %value)
       (input %input))
 
-    (define ((%fail) input) #f)
+    (define ((*fail) input) #f)
 
-    (define ((%identity) input)
+    (define ((*identity) input)
       (if (null? input) #f
         (%result
           (car input)
           (lseq-rest input))))
 
-    (define ((%return value) input)
+    (define ((*return value) input)
       (%result value input))
 
-    (define ((%bind parser combinator) input)
+    (define ((*bind parser combinator) input)
       (and-let*
         ((result (parser input)))
         ((combinator (%value result)) (%input result))))
 
-    (define ((%any-of parser . parsers) input)
-      (or (parser input)
-        (if (null? parsers) #f
-          ((apply %any-of parsers) input))))
+    (define ((*chain parser . parsers) input)
+      (if (null? parsers)
+        (parser input)
+        ((apply *chain parsers)
+         (generator->lseq
+           (make-coroutine-generator
+             (lambda (yield)
+               (let loop ((input input))
+                 (and-let*
+                   ((result (parser input)))
+                   (yield (%value result))
+                   (loop (%input result))))))))))
 
-    (define (%foldr proc init parsers)
-      (%bind
+    (define (*foldl proc init parsers)
+      (*bind
         (car parsers)
         (lambda (value)
-          (%bind
+          (let
+            ((rest (cdr parsers))
+             (next (proc init value)))
+            (if (null? rest)
+              (*return next)
+              (*foldl proc next rest))))))
+
+    (define (*foldr proc init parsers)
+      (*bind
+        (car parsers)
+        (lambda (value)
+          (*bind
             (let ((rest (cdr parsers)))
-              (if (null? rest) (%return init)
-                (%foldr proc init rest)))
+              (if (null? rest)
+                (*return init)
+                (*foldr proc init rest)))
             (lambda (next)
-              (%return (proc value next)))))))
+              (*return (proc value next)))))))
 
-    (define (%each-of . parsers)
-      (%foldr cons '() parsers))
+    (define ((*any-of parser . parsers) input)
+      (or (parser input)
+        (if (null? parsers) #f
+          ((apply *any-of parsers) input))))
 
-    (define (%none)
-      (%return '()))
+    (define (*each-of . parsers)
+      (*foldr cons '() parsers))
 
-    (define ((%not parser) input)
+    (define (*none)
+      (*return '()))
+
+    (define ((*not parser) input)
       (if (parser input) #f
-        ((%none) input)))
+        ((*none) input)))
 
-    (define (%maybe parser)
-      (%any-of parser (%none)))
+    (define (*maybe parser)
+      (*any-of parser (*none)))
 
-    (define (%zero-or-more parser)
-      (%maybe (%one-or-more parser)))
+    (define (*zero-or-more parser)
+      (*maybe (*one-or-more parser)))
 
-    (define (%one-or-more parser)
-      (%bind
+    (define (*one-or-more parser)
+      (*bind
         parser
         (lambda (value)
-          (%bind
-            (%zero-or-more parser)
+          (*bind
+            (*zero-or-more parser)
             (lambda (next)
-              (%return (cons value next)))))))
+              (*return (cons value next)))))))
 
-    (define (%is predicate . args)
-      (%bind
-        (%identity)
+    (define (*is predicate . args)
+      (*bind
+        (*identity)
         (lambda (value)
           (if (apply predicate (cons value args))
-            (%return value)
-            (%fail)))))
+            (*return value)
+            (*fail)))))
 
     ))

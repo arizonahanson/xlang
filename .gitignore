@@ -1,7 +1,7 @@
 Makefile
 xlang
-*.so
-*.o
 *.c
 *.import.scm
 *.link
+*.o
+*.so

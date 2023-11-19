@@ -9,8 +9,8 @@
     (xlang sigil))
   (begin
 
-    ((%bind
-       (%string (*integer))
+    ((*bind
+       (*string (*integer))
        (lambda (value)
          (display value)
          (newline)
