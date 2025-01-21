@@ -23,11 +23,9 @@
     (define (*digit)
       (*char-set-is char-set:digit))
 
-    (define char-set:nonzero
-      (char-set-delete char-set:digit #\0))
-
     (define (*nonzero)
-      (*char-set-is char-set:nonzero))
+      (*is (lambda (value)
+        (not (equal? value #\0)))))
 
     (define (*letter)
       (*char-set-is char-set:letter))

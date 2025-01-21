@@ -17,7 +17,7 @@
   (export
     %result
     %value
-    %input
+    %stream
     *fail
     *identity
     *return
@@ -36,39 +36,39 @@
   (begin
 
     (define-record-type result%
-      (%result value input)
+      (%result value stream)
       %result?
       (value %value)
-      (input %input))
+      (stream %stream))
 
-    (define ((*fail) input) #f)
+    (define ((*fail) stream) #f)
 
-    (define ((*identity) input)
-      (if (null? input) #f
+    (define ((*identity) stream)
+      (if (null? stream) #f
         (%result
-          (car input)
-          (lseq-rest input))))
+          (car stream)
+          (lseq-rest stream))))
 
-    (define ((*return value) input)
-      (%result value input))
+    (define ((*return value) stream)
+      (%result value stream))
 
-    (define ((*bind parser combinator) input)
+    (define ((*bind parser combinator) stream)
       (and-let*
-        ((result (parser input)))
-        ((combinator (%value result)) (%input result))))
+        ((result (parser stream)))
+        ((combinator (%value result)) (%stream result))))
 
-    (define ((*chain parser . parsers) input)
+    (define ((*chain parser . parsers) stream)
       (if (null? parsers)
-        (parser input)
+        (parser stream)
         ((apply *chain parsers)
          (generator->lseq
            (make-coroutine-generator
              (lambda (yield)
-               (let loop ((input input))
+               (let loop ((input stream))
                  (and-let*
                    ((result (parser input)))
                    (yield (%value result))
-                   (loop (%input result))))))))))
+                   (loop (%stream result))))))))))
 
     (define (*foldl proc init parsers)
       (*bind
@@ -93,10 +93,10 @@
             (lambda (next)
               (*return (proc value next)))))))
 
-    (define ((*any-of parser . parsers) input)
-      (or (parser input)
+    (define ((*any-of parser . parsers) stream)
+      (or (parser stream)
         (if (null? parsers) #f
-          ((apply *any-of parsers) input))))
+          ((apply *any-of parsers) stream))))
 
     (define (*each-of . parsers)
       (*foldr cons '() parsers))
@@ -104,9 +104,9 @@
     (define (*none)
       (*return '()))
 
-    (define ((*not parser) input)
-      (if (parser input) #f
-        ((*none) input)))
+    (define ((*not parser) stream)
+      (if (parser stream) #f
+        ((*none) stream)))
 
     (define (*maybe parser)
       (*any-of parser (*none)))
