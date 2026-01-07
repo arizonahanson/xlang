@@ -1,83 +1,93 @@
-(** @author Arizona Hanson *)
+(** @author Arizona Hanson 
+  just, bind/let*, any/either/<|>, never,
+  maybe, many, some, foldr, foldl, all/both/<&>
+*)
 
-(** [fail] always fails, returning None *)
-let fail source = None
+(** [just] trivially produce [value] without consuming [source] *)
+let just value source =
+  Some (value, source)
 
-(** [return] trivially produces [value] without consuming from the [source] *)
-let return value source = Some (value, source)
-
-(** [bind] combines [parse] with [take] sequentially, passing the value 
-  produced by [parse] as an argument to [take], which returns a new parser *)
-let bind parse take source =
+(** [bind] combines [parse] with [combo] sequentially, passing the value 
+  produced by [parse] as an argument to [combo], which returns a new parser.
+  short-circuits if [parse] fails by returning None *)
+let bind parse combo source =
   match parse source with
-  | None -> None
-  | Some (sink, link) -> link |> take sink
+  | None -> None (* fail *)
+  | Some (value, tail) -> tail |> combo value
+let ( let* ) = bind
 
-let ( >>= ) = bind
-let ( let@ ) = bind
-
-(** [choose] produces a value from the first parser in [parsers] to succeed,
-  if none succeed, [choose] fails *)
-let rec choose parsers source =
+(** [any] produces a value from the first parser in [parsers] to succeed,
+  if none succeed, [any] fails *)
+let rec any parsers source =
   match parsers with
   | [] -> None
   | parse :: more -> (
       match parse source with
       | Some result -> Some result
-      | None -> source |> choose more
+      | None -> source |> any more
   )
 
-let ( <|> ) p1 p2 = choose [p1; p2]
+(** binary [any] (either) *)
+let either p q = any [p; q]
+let ( <|> ) = either
 
-(** [nil] trivially produces [[]] without consuming from the [source] *)
-let nil source = source |> return []
-
-(** [no] produces [[]] if [parse] fails, and fails if [parse] succeeds *)
-let no parse source =
+(** [never] fails if [parse] succeeds, otherwise produces [[]] *)
+let never parse source =
   match parse source with
   | Some result -> None
-  | None -> source |> nil
+  | None -> source |> just []
 
 (* -- derivitives (no mention of [source] due to partial application) -- *)
 
 (** [maybe] always succeeds, producing the value from [parse], if [parse]
   fails, [maybe] produces [[]] *)
-let maybe parse = parse <|> nil
+let maybe parse =
+  parse <|> just []
 
 (** [many] produces a list of zero or more values, one for every successful
-  [parse]. produces [[]] if [parse] does not succeed at least once *)
-let rec many parse = maybe @@ some parse
+  [parse]. produces [[]] if [parse] does not succeed at least once.
+  mutually-recursive with [some] *)
+let rec many parse =
+  maybe @@ some parse
 
 (** [some] produces a list of one or more values, one for every successful
-  [parse]. [parse] must succeed at least once *)
+  [parse]. [parse] must succeed at least once. mutually-recursive with [many] *)
 and some parse =
-  let@ value = parse in
-  let@ next = many parse in
-  return @@ value :: next
+  let* value = parse in
+  let* next = many parse in
+  just @@ value :: next
 
-let rec foldr fn init parsers =
+(** [foldr] applies [binop] to the value from the first parser in [parsers],
+and the value from applying [binop] to the rest of the parsers recursively,
+ending with [init] and accumulating from right to left *)
+let rec foldr binop init parsers =
   match parsers with
-  | [] -> return init
+  | [] -> just init (* terminator *)
   | parse :: more -> (
-    let@ value = parse in
-    let@ next = foldr fn init more in
-    return @@ fn value next
+    let* value = parse in
+    let* next = foldr binop init more in
+    just @@ binop value next
   )
 
-let rec foldl fn init parsers =
+(** [foldl] applies [binop] to the value from the first parser in [parsers],
+and the value from applying [binop] to the rest of the parsers recursively,
+starting with [init] and accumulating from left to right *)
+let rec foldl binop init parsers =
   match parsers with
-  | [] -> zero
+  | [] -> just init (* no-op *)
   | parse :: more -> (
-    let@ value = parse in
-    let result = fn init value in
+    let* value = parse in
+    let result = binop init value in
     match more with
-    | [] -> return result
-    | _ :: _ -> foldl fn result more
+    | [] -> just result (* terminator *)
+    | _ :: _ -> foldl binop result more
   )
 
-(** [each] produces a sequence of values, one for each parser in [parsers].
-  [each] fails upon the failure of any parser in [parsers] *)
-let each parsers =
+(** [all] produces a sequence of values, one for every parser in [parsers].
+  [all] fails if any parser in [parsers] fails *)
+let all parsers =
   foldr List.cons [] parsers
 
-let ( <~> ) p1 p2 = each [p1; p2]
+(** binary [all] (both) *)
+let both p q = all [p; q]
+let ( <&> ) = both
